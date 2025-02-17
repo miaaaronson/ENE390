@@ -1,9 +1,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 # importing raw data (like from a raw CSV or excel file that someone downloaded and gave to me)
 raw_df = pd.read_csv(
-    "/Users/miaaaronson/Desktop/VS Code Repositories/Thesis_Work/Data/Bubble Data Compiled - 03_01-19_2022.csv"
+    "/Users/miaaaronson/Desktop/ENE390/Thesis_Work/Data/Bubble Data Compiled - 03_01-19_2022.csv"
 )
 
 # consolidating relevant data by isolating based on the title of the column
@@ -46,3 +47,44 @@ df.rename(
 )
 
 df.head()
+
+df = df.dropna(subset=["Temperature in Degrees C"])
+
+df["Time and Date"] = pd.to_datetime(df["Time and Date"], format="%m-%d-%Y %H:%M:%S")
+df["Temperature in Degrees C"] = pd.to_numeric(
+    df["Temperature in Degrees C"], errors="coerce"
+)
+
+x = df["Time and Date"]
+y = df["Temperature in Degrees C"]
+
+exponential_smoothing_model = ExponentialSmoothing(
+    y, trend=None, seasonal=None, damped_trend=False
+)
+fit_model = exponential_smoothing_model.fit()
+
+y_smooth = fit_model.predict(
+    start=len(df["Temperature in Degrees C"]), end=len(df["Temperature in Degrees C"])
+)
+
+# projecting smoothing method onto all of the time points
+y_smooth = fit_model.fittedvalues
+
+# plotting
+plt.plot(x, y, label="Raw Data", color="#BCD2E8")
+plt.plot(x, y_smooth, label="Smoothed Data", color="#0818A8")
+
+# labels
+plt.xlabel("Time and Date")
+plt.ylabel("Water Temperature in Degrees C")
+
+# rotating the x axis labels so I can read them
+plt.xticks(x[::500], rotation=45)
+plt.ylim(13.142, 13.1555)
+plt.title(
+    "Water Temperature of Bubble using an EXO Sonde: 03012022-03182022; Exponential Smoothing Method"
+)
+plt.legend()
+
+# showing the plot
+plt.show()

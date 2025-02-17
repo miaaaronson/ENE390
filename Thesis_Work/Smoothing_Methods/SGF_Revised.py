@@ -4,7 +4,7 @@ from scipy import signal
 
 # importing raw data (like from a raw CSV or excel file that someone downloaded and gave to me)
 raw_df = pd.read_csv(
-    "/Users/miaaaronson/Desktop/VS Code Repositories/Thesis_Work/Data/Bubble Data Compiled - 03_01-19_2022.csv"
+    "/Users/miaaaronson/Desktop/ENE390/Thesis_Work/Data/Bubble Data Compiled - 03_01-19_2022 2.csv"
 )
 
 # consolidating relevant data by isolating based on the title of the column
