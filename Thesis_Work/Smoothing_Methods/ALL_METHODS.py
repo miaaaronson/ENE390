@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from scipy import signal
+from statsmodels.nonparametric.smoothers_lowess import lowess
 
 # importing raw data (like from a raw CSV or excel file that someone downloaded and gave to me)
 raw_df = pd.read_csv(
@@ -75,12 +76,15 @@ y_smooth_ma = y.rolling(window=50, center=True).mean()
 # SGF
 y_smooth_SGF = signal.savgol_filter(y, window_length=150, polyorder=3, mode="nearest")
 
-fig, axs = plt.subplots(4, 1, figsize=(6, 9))
+#lowess
+smoothed = lowess(df['Temperature in Degrees C'], range(len(df)), frac=0.05)
+
+fig, axs = plt.subplots(5, 1, figsize=(6, 10))
 plt.subplots_adjust(
     left=0.2,
     bottom=0.13,
     hspace=0.4,
-)  # Adjust the vertical space between subplots
+) 
 fig.supylabel("Temperature in Degrees C", fontsize=12)  # Single large y-axis label
 fig.supxlabel("Date", fontsize=12)  # Single large x-axis label
 for ax in axs[:-1]:
@@ -106,12 +110,17 @@ axs[2].plot(x, y_smooth_ma, label="Smoothed Data", color="#0818A8")
 axs[2].set_title("Moving Average Smoothing Method")
 axs[2].legend()
 
-# SGF graph
-axs[3].plot(x, y, label="Raw Data", color="#BCD2E8")
-axs[3].plot(x, y_smooth_SGF, label="Smoothed Data", color="#0818A8")
-axs[3].set_xticks(x[::500])
-axs[3].tick_params(axis="x", rotation=45)
-axs[3].set_title("Savitzky-Golay Filtering Smoothing Method")
+axs[3].plot(df['Temperature in Degrees C'], label='Raw Data', color = '#BCD2E8')
+axs[3].plot(smoothed[:, 1], label='Smoothed Values', color = '#0818A8')
+axs[3].set_title('Lowess Smoothing Method')
 axs[3].legend()
+
+# SGF graph
+axs[4].plot(x, y, label="Raw Data", color="#BCD2E8")
+axs[4].plot(x, y_smooth_SGF, label="Smoothed Data", color="#0818A8")
+axs[4].set_xticks(x[::500])
+axs[4].tick_params(axis="x", rotation=45)
+axs[4].set_title("Savitzky-Golay Filtering Smoothing Method")
+axs[4].legend()
 
 plt.show()
