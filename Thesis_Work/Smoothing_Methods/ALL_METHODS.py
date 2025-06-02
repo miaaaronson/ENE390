@@ -4,61 +4,102 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from scipy import signal
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
-# importing raw data (like from a raw CSV or excel file that someone downloaded and gave to me)
-raw_df = pd.read_csv(
-    "/Users/miaaaronson/Desktop/ENE390/Thesis_Work/Data/Smoothing_Data.csv"
+raw_df_2024 = pd.read_csv(
+    "/Users/miaaaronson/Desktop/ENE390/Thesis_Work/Data/ALL_BUBBLE_DATA_2024.csv"
+)
+raw_df_2023 = pd.read_csv(
+    "/Users/miaaaronson/Desktop/ENE390/Thesis_Work/Data/ALL_BUBBLE_DATA_2023.csv"
+)
+raw_df_2021to032023 = pd.read_csv(
+    "/Users/miaaaronson/Desktop/ENE390/Thesis_Work/Data/ALL_BUBBLE_TEMPS_2021to03:2023 2.csv"
 )
 
-# consolidating relevant data by isolating based on the title of the column
-df = raw_df[
+
+def clean_water_data(raw_df):
+    # Consolidate relevant data by selecting specific columns
+    df = raw_df[
+        [
+            "Site",
+            "X2",
+            "X2.1",
+            "X2.2",
+            "X2.3",
+            "X2.4",
+        ]
+    ]
+
+    # Set the second row as column headers
+    df.columns = df.iloc[1]
+
+    # Remove the first two rows and reset index
+    df = df[2:].reset_index(drop=True)
+
+    # Convert column names to a list for manipulation
+    column_names = df.columns.to_list()
+
+    # Rename specific NaN columns
+    column_names[0] = "Time and Date"
+    column_names[3] = "pH Value"
+
+    # Set updated column names back to DataFrame
+    df.columns = column_names
+
+    # Rename other columns for clarity
+    df.rename(
+        columns={
+            "C": "Temperature (C)",
+            "uS/cm": "Specific Conductivity (uS/cm)",
+            "%": "ODO (Saturation)",
+            "mg/L": "ODO (mg/L)",
+        },
+        inplace=True,
+    )
+
+    # Drop rows where Temperature in Degrees C is NaN
+    df = df.dropna(subset=["Temperature (C)"])
+
+    # Convert columns to appropriate data types
+    df["Time and Date"] = pd.to_datetime(
+        df["Time and Date"], format="%m-%d-%Y %H:%M:%S"
+    )
+    df["Temperature (C)"] = pd.to_numeric(df["Temperature (C)"], errors="coerce")
+
+    return df
+
+
+final_2021on = raw_df_2021to032023.iloc[2:]
+final_2021on = final_2021on.dropna()
+final_2021on.rename(columns={"C": "Temperature (C)"}, inplace=True)
+final_2021on["Time and Date"] = pd.to_datetime(
+    final_2021on["Time and Date"], format="%m-%d-%Y %H:%M:%S"
+)
+x_1 = final_2021on["Time and Date"]
+y_1 = final_2021on["Temperature (C)"]
+
+final_2024 = clean_water_data(raw_df_2024)
+final_2024 = final_2024[["Time and Date", "Temperature (C)"]]
+x_3 = final_2024["Time and Date"]
+y_3 = final_2024["Temperature (C)"]
+
+final_2023 = clean_water_data(raw_df_2023)
+final_2023 = final_2023[["Time and Date", "Temperature (C)"]]
+x_2 = final_2023["Time and Date"]
+y_2 = final_2023["Temperature (C)"]
+
+
+all_temp_data = pd.concat([final_2021on, final_2023, final_2024]).reset_index(drop=True)
+
+max_threshold = 13.3
+min_threshold = 13
+
+x = all_temp_data["Time and Date"]
+y = all_temp_data[
     [
-        "Site",
-        "X2 Legacy.12",
-        "X2 Legacy.13",
-        "X2 Legacy.14",
-        "X2 Legacy.15",
-        "X2 Legacy.16",
+        (all_temp_data["Temperature (C)"] > min_threshold)
+        & (all_temp_data["Temperature (C)"] < max_threshold)
     ]
 ]
 
-# setting the second row (with an index of 1) as the column headers (getting rid of Legacy.XX)
-df.columns = df.iloc[1]
-
-# removing the first two rows because the first intital row (Legacy Row) is not needed and the second row is now the index row (doesnt need to be in data set)
-df = df[2:].reset_index(drop=True)
-
-# turning the column names into a list to manipulate names
-column_names = df.columns.to_list()
-
-# Assign new names to specific NaN columns by index
-column_names[0] = "Time and Date"  # Rename first NaN column
-column_names[3] = "pH Value"  # Rename another NaN column
-
-# Set updated column names back to DataFrame
-df.columns = column_names
-
-# renaming the column titles to better fit with the data set
-df.rename(
-    columns={
-        "C": "Temperature in Degrees C",
-        "uS/cm": "Specific Conductivity in uS/cm",
-        "%": "ODO Saturation Percentage",
-        "mg/L": "ODO in mg/L",
-    },
-    inplace=True,
-)
-
-df.head()
-
-df = df.dropna(subset=["Temperature in Degrees C"])
-
-df["Time and Date"] = pd.to_datetime(df["Time and Date"], format="%m-%d-%Y %H:%M:%S")
-df["Temperature in Degrees C"] = pd.to_numeric(
-    df["Temperature in Degrees C"], errors="coerce"
-)
-
-x = df["Time and Date"]
-y = df["Temperature in Degrees C"]
 
 # exponential smoothing
 exponential_smoothing_model = ExponentialSmoothing(
@@ -66,7 +107,8 @@ exponential_smoothing_model = ExponentialSmoothing(
 )
 fit_model = exponential_smoothing_model.fit()
 y_smooth_es = fit_model.predict(
-    start=len(df["Temperature in Degrees C"]), end=len(df["Temperature in Degrees C"])
+    start=len(all_temp_data["Temperature (C)"]),
+    end=len(all_temp_data["Temperature (C)"]),
 )
 y_smooth_es = fit_model.fittedvalues
 
@@ -77,7 +119,9 @@ y_smooth_ma = y.rolling(window=50, center=True).mean()
 y_smooth_SGF = signal.savgol_filter(y, window_length=150, polyorder=3, mode="nearest")
 
 # lowess
-smoothed = lowess(df["Temperature in Degrees C"], range(len(df)), frac=0.05)
+smoothed = lowess(
+    all_temp_data["Temperature (C)"], range(len(all_temp_data)), frac=0.05
+)
 
 fig, axs = plt.subplots(5, 1, figsize=(6, 10))
 plt.subplots_adjust(
@@ -110,7 +154,7 @@ axs[2].plot(x, y_smooth_ma, label="Smoothed Data", color="#0818A8")
 axs[2].set_title("Moving Average Smoothing Method")
 axs[2].legend()
 
-axs[3].plot(df["Temperature in Degrees C"], label="Raw Data", color="#BCD2E8")
+axs[3].plot(all_temp_data["Temperature (C)"], label="Raw Data", color="#BCD2E8")
 axs[3].plot(smoothed[:, 1], label="Smoothed Values", color="#0818A8")
 axs[3].set_title("Lowess Smoothing Method")
 axs[3].legend()
@@ -118,7 +162,7 @@ axs[3].legend()
 # SGF graph
 axs[4].plot(x, y, label="Raw Data", color="#BCD2E8")
 axs[4].plot(x, y_smooth_SGF, label="Smoothed Data", color="#0818A8")
-axs[4].set_xticks(x[::500])
+axs[4].set_xticks(x[::10000])
 axs[4].tick_params(axis="x", rotation=45)
 axs[4].set_title("Savitzky-Golay Filtering Smoothing Method")
 axs[4].legend()
